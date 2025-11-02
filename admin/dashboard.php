@@ -36,6 +36,10 @@ $stats['pesages_aujourdhui'] = $stmt->fetch()['total'];
 // Répartitions (Entrées vs Sorties) sur période
 $start_input = isset($_GET['start']) ? $_GET['start'] : date('Y-01-01');
 $end_input = isset($_GET['end']) ? $_GET['end'] : date('Y-12-31');
+// Nouveaux filtres
+$mode = isset($_GET['mode']) && in_array($_GET['mode'], ['tous','camion','bateau'], true) ? $_GET['mode'] : 'tous';
+$mouvement = isset($_GET['mouvement']) && in_array($_GET['mouvement'], ['tous','entree','sortie'], true) ? $_GET['mouvement'] : 'tous';
+$typeId = isset($_GET['type_id']) && $_GET['type_id'] !== '' ? (int)$_GET['type_id'] : null;
 try { $start_date = new DateTime($start_input); } catch (Exception $e) { $start_date = new DateTime(date('Y-01-01')); }
 try { $end_date = new DateTime($end_input); } catch (Exception $e) { $end_date = new DateTime(date('Y-12-31')); }
 if ($end_date < $start_date) { $end_date = clone $start_date; }
@@ -51,27 +55,37 @@ $period = new DatePeriod(
 $monthLabels = [];
 foreach ($period as $dt) { $monthLabels[] = $dt->format('Y-m'); }
 
-// Camions par mois
-$stmt = $db->prepare("SELECT DATE_FORMAT(date_entree, '%Y-%m') m, COUNT(*) c FROM camions WHERE date_entree BETWEEN ? AND ? GROUP BY m");
-$stmt->execute([$start_ts, $end_ts]);
+// Camions par mois (respecte mode et type)
 $camions_entree_map = [];
-foreach ($stmt->fetchAll() as $r) { $camions_entree_map[$r['m']] = (int)$r['c']; }
-
-$stmt = $db->prepare("SELECT DATE_FORMAT(date_sortie, '%Y-%m') m, COUNT(*) c FROM camions WHERE date_sortie BETWEEN ? AND ? GROUP BY m");
-$stmt->execute([$start_ts, $end_ts]);
 $camions_sortie_map = [];
-foreach ($stmt->fetchAll() as $r) { $camions_sortie_map[$r['m']] = (int)$r['c']; }
+if ($mode === 'tous' || $mode === 'camion') {
+    $typeFilterExists = $typeId ? " AND EXISTS (SELECT 1 FROM marchandises_camions mc WHERE mc.camion_id=c.id AND mc.type_marchandise_id=?)" : "";
+    $stmt = $db->prepare("SELECT DATE_FORMAT(c.date_entree, '%Y-%m') m, COUNT(*) c FROM camions c WHERE c.date_entree BETWEEN ? AND ?" . $typeFilterExists . " GROUP BY m");
+    $params = [$start_ts, $end_ts]; if ($typeId) { $params[] = $typeId; }
+    $stmt->execute($params);
+    foreach ($stmt->fetchAll() as $r) { $camions_entree_map[$r['m']] = (int)$r['c']; }
 
-// Bateaux par mois
-$stmt = $db->prepare("SELECT DATE_FORMAT(b.date_entree, '%Y-%m') m, COUNT(DISTINCT UPPER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(b.immatriculation),' ',''),'-',''),'/', ''),'.',''),'_',''))) c FROM bateaux b WHERE b.date_entree BETWEEN ? AND ? AND (b.date_sortie IS NULL OR b.date_entree < b.date_sortie) GROUP BY m");
-$stmt->execute([$start_ts, $end_ts]);
+    $stmt = $db->prepare("SELECT DATE_FORMAT(c.date_sortie, '%Y-%m') m, COUNT(*) c FROM camions c WHERE c.date_sortie BETWEEN ? AND ?" . $typeFilterExists . " GROUP BY m");
+    $params = [$start_ts, $end_ts]; if ($typeId) { $params[] = $typeId; }
+    $stmt->execute($params);
+    foreach ($stmt->fetchAll() as $r) { $camions_sortie_map[$r['m']] = (int)$r['c']; }
+}
+
+// Bateaux par mois (respecte mode et type)
 $bateaux_entree_map = [];
-foreach ($stmt->fetchAll() as $r) { $bateaux_entree_map[$r['m']] = (int)$r['c']; }
-
-$stmt = $db->prepare("SELECT DATE_FORMAT(b.date_sortie, '%Y-%m') m, COUNT(DISTINCT UPPER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(b.immatriculation),' ',''),'-',''),'/', ''),'.',''),'_',''))) c FROM bateaux b WHERE b.date_sortie BETWEEN ? AND ? GROUP BY m");
-$stmt->execute([$start_ts, $end_ts]);
 $bateaux_sortie_map = [];
-foreach ($stmt->fetchAll() as $r) { $bateaux_sortie_map[$r['m']] = (int)$r['c']; }
+if ($mode === 'tous' || $mode === 'bateau') {
+    $typeFilterExistsB = $typeId ? " AND EXISTS (SELECT 1 FROM marchandises_bateaux mb WHERE mb.bateau_id=b.id AND mb.type_marchandise_id=?)" : "";
+    $stmt = $db->prepare("SELECT DATE_FORMAT(b.date_entree, '%Y-%m') m, COUNT(DISTINCT UPPER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(b.immatriculation),' ',''),'-',''),'/', ''),'.',''),'_',''))) c FROM bateaux b WHERE b.date_entree BETWEEN ? AND ? AND (b.date_sortie IS NULL OR b.date_entree < b.date_sortie)" . $typeFilterExistsB . " GROUP BY m");
+    $params = [$start_ts, $end_ts]; if ($typeId) { $params[] = $typeId; }
+    $stmt->execute($params);
+    foreach ($stmt->fetchAll() as $r) { $bateaux_entree_map[$r['m']] = (int)$r['c']; }
+
+    $stmt = $db->prepare("SELECT DATE_FORMAT(b.date_sortie, '%Y-%m') m, COUNT(DISTINCT UPPER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(b.immatriculation),' ',''),'-',''),'/', ''),'.',''),'_',''))) c FROM bateaux b WHERE b.date_sortie BETWEEN ? AND ?" . $typeFilterExistsB . " GROUP BY m");
+    $params = [$start_ts, $end_ts]; if ($typeId) { $params[] = $typeId; }
+    $stmt->execute($params);
+    foreach ($stmt->fetchAll() as $r) { $bateaux_sortie_map[$r['m']] = (int)$r['c']; }
+}
 
 $series_camions_entrees = [];
 $series_camions_sorties = [];
@@ -121,55 +135,91 @@ foreach ($annualMonthLabels as $m) {
     $series_bateaux_sorties_annee[] = $bateaux_sortie_year_map[$m] ?? 0;
 }
 
-// Totaux période
-$stmt = $db->prepare("SELECT COUNT(*) t FROM camions WHERE date_entree BETWEEN ? AND ?");
-$stmt->execute([$start_ts, $end_ts]);
-$total_camions_entree_periode = (int)$stmt->fetch()['t'];
+// Totaux période (respecte mode et type)
+$total_camions_entree_periode = 0;
+$total_camions_sortie_periode = 0;
+if ($mode === 'tous' || $mode === 'camion') {
+    $typeFilterExists = $typeId ? " AND EXISTS (SELECT 1 FROM marchandises_camions mc WHERE mc.camion_id=c.id AND mc.type_marchandise_id=?)" : "";
+    $stmt = $db->prepare("SELECT COUNT(*) t FROM camions c WHERE c.date_entree BETWEEN ? AND ?" . $typeFilterExists);
+    $params = [$start_ts, $end_ts]; if ($typeId) { $params[] = $typeId; }
+    $stmt->execute($params);
+    $total_camions_entree_periode = (int)$stmt->fetch()['t'];
 
-$stmt = $db->prepare("SELECT COUNT(*) t FROM camions WHERE date_sortie BETWEEN ? AND ?");
-$stmt->execute([$start_ts, $end_ts]);
-$total_camions_sortie_periode = (int)$stmt->fetch()['t'];
-$stmt = $db->prepare("SELECT COUNT(DISTINCT UPPER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(b.immatriculation),' ',''),'-',''),'/', ''),'.',''),'_',''))) t FROM bateaux b WHERE b.date_entree BETWEEN ? AND ? AND (b.date_sortie IS NULL OR b.date_entree < b.date_sortie)");
-$stmt->execute([$start_ts, $end_ts]);
-$total_bateaux_entree_periode = (int)$stmt->fetch()['t'];
-$stmt = $db->prepare("SELECT COUNT(DISTINCT UPPER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(b.immatriculation),' ',''),'-',''),'/', ''),'.',''),'_',''))) t FROM bateaux b WHERE b.date_sortie BETWEEN ? AND ?");
-$stmt->execute([$start_ts, $end_ts]);
-$total_bateaux_sortie_periode = (int)$stmt->fetch()['t'];
+    $stmt = $db->prepare("SELECT COUNT(*) t FROM camions c WHERE c.date_sortie BETWEEN ? AND ?" . $typeFilterExists);
+    $params = [$start_ts, $end_ts]; if ($typeId) { $params[] = $typeId; }
+    $stmt->execute($params);
+    $total_camions_sortie_periode = (int)$stmt->fetch()['t'];
+}
 
-// Répartition par type pour le mois courant (ignorer les filtres de recherche)
-$month_start = date('Y-m-01 00:00:00');
-$month_end = date('Y-m-t 23:59:59');
+$total_bateaux_entree_periode = 0;
+$total_bateaux_sortie_periode = 0;
+if ($mode === 'tous' || $mode === 'bateau') {
+    $typeFilterExistsB = $typeId ? " AND EXISTS (SELECT 1 FROM marchandises_bateaux mb WHERE mb.bateau_id=b.id AND mb.type_marchandise_id=?)" : "";
+    $stmt = $db->prepare("SELECT COUNT(DISTINCT UPPER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(b.immatriculation),' ',''),'-',''),'/', ''),'.',''),'_',''))) t FROM bateaux b WHERE b.date_entree BETWEEN ? AND ? AND (b.date_sortie IS NULL OR b.date_entree < b.date_sortie)" . $typeFilterExistsB);
+    $params = [$start_ts, $end_ts]; if ($typeId) { $params[] = $typeId; }
+    $stmt->execute($params);
+    $total_bateaux_entree_periode = (int)$stmt->fetch()['t'];
+    $stmt = $db->prepare("SELECT COUNT(DISTINCT UPPER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(TRIM(b.immatriculation),' ',''),'-',''),'/', ''),'.',''),'_',''))) t FROM bateaux b WHERE b.date_sortie BETWEEN ? AND ?" . $typeFilterExistsB);
+    $params = [$start_ts, $end_ts]; if ($typeId) { $params[] = $typeId; }
+    $stmt->execute($params);
+    $total_bateaux_sortie_periode = (int)$stmt->fetch()['t'];
+}
+
+// Répartition par type — Mois (respecte filtres et recherche)
+if ($start_date->format('Y-m') === $end_date->format('Y-m')) {
+    // Utiliser le mois de la recherche si même mois
+    $month_start = $start_date->format('Y-m-01 00:00:00');
+    $month_end = (new DateTime($start_date->format('Y-m-01')))->modify('last day of this month')->format('Y-m-d 23:59:59');
+} else {
+    // Sinon, mois courant
+    $month_start = date('Y-m-01 00:00:00');
+    $month_end = date('Y-m-t 23:59:59');
+}
 $month_type_map = [];
-// Camions - Entrée (mois)
-$stmt = $db->prepare("SELECT tm.nom t, SUM(mc.poids) s
-    FROM marchandises_camions mc
-    JOIN types_marchandises tm ON tm.id = mc.type_marchandise_id
-    JOIN camions c ON c.id = mc.camion_id
-    WHERE (mc.mouvement IS NULL OR mc.mouvement = 'entree')
-      AND mc.poids IS NOT NULL
-      AND c.date_entree BETWEEN ? AND ?
-    GROUP BY t");
-$stmt->execute([$month_start, $month_end]);
-foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($month_type_map[$t])) $month_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $month_type_map[$t]['entree'] += $s; }
-// Camions - Sortie (mois)
-$stmt = $db->prepare("SELECT tm.nom t, SUM(mc.poids) s
-    FROM marchandises_camions mc
-    JOIN types_marchandises tm ON tm.id = mc.type_marchandise_id
-    JOIN camions c ON c.id = mc.camion_id
-    WHERE mc.mouvement = 'sortie'
-      AND mc.poids IS NOT NULL
-      AND c.date_sortie BETWEEN ? AND ?
-    GROUP BY t");
-$stmt->execute([$month_start, $month_end]);
-foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($month_type_map[$t])) $month_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $month_type_map[$t]['sortie'] += $s; }
-// Bateaux - Entrée (mois)
-$stmt = $db->prepare("SELECT tm.nom t, SUM(mb.poids) s FROM marchandises_bateaux mb JOIN types_marchandises tm ON tm.id=mb.type_marchandise_id WHERE mb.mouvement='entree' AND mb.poids IS NOT NULL AND mb.created_at BETWEEN ? AND ? GROUP BY t");
-$stmt->execute([$month_start, $month_end]);
-foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($month_type_map[$t])) $month_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $month_type_map[$t]['entree'] += $s; }
-// Bateaux - Sortie (mois)
-$stmt = $db->prepare("SELECT tm.nom t, SUM(mb.poids) s FROM marchandises_bateaux mb JOIN types_marchandises tm ON tm.id=mb.type_marchandise_id WHERE mb.mouvement='sortie' AND mb.poids IS NOT NULL AND mb.created_at BETWEEN ? AND ? GROUP BY t");
-$stmt->execute([$month_start, $month_end]);
-foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($month_type_map[$t])) $month_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $month_type_map[$t]['sortie'] += $s; }
+// Camions - Entrée (période)
+if ($mode === 'tous' || $mode === 'camion') {
+    if ($mouvement === 'tous' || $mouvement === 'entree') {
+        $stmt = $db->prepare("SELECT tm.nom t, SUM(mc.poids) s
+            FROM marchandises_camions mc
+            JOIN types_marchandises tm ON tm.id = mc.type_marchandise_id
+            JOIN camions c ON c.id = mc.camion_id
+            WHERE (mc.mouvement IS NULL OR mc.mouvement = 'entree')
+              AND mc.poids IS NOT NULL
+              AND c.date_entree BETWEEN ? AND ?" . ($typeId ? " AND mc.type_marchandise_id = ?" : "") . "
+            GROUP BY t");
+        $params = [$month_start, $month_end]; if ($typeId) { $params[] = $typeId; }
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($month_type_map[$t])) $month_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $month_type_map[$t]['entree'] += $s; }
+    }
+    if ($mouvement === 'tous' || $mouvement === 'sortie') {
+        $stmt = $db->prepare("SELECT tm.nom t, SUM(mc.poids) s
+            FROM marchandises_camions mc
+            JOIN types_marchandises tm ON tm.id = mc.type_marchandise_id
+            JOIN camions c ON c.id = mc.camion_id
+            WHERE mc.mouvement = 'sortie'
+              AND mc.poids IS NOT NULL
+              AND c.date_sortie BETWEEN ? AND ?" . ($typeId ? " AND mc.type_marchandise_id = ?" : "") . "
+            GROUP BY t");
+        $params = [$month_start, $month_end]; if ($typeId) { $params[] = $typeId; }
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($month_type_map[$t])) $month_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $month_type_map[$t]['sortie'] += $s; }
+    }
+}
+// Bateaux - Entrée/Sortie (période)
+if ($mode === 'tous' || $mode === 'bateau') {
+    if ($mouvement === 'tous' || $mouvement === 'entree') {
+        $stmt = $db->prepare("SELECT tm.nom t, SUM(mb.poids) s FROM marchandises_bateaux mb JOIN types_marchandises tm ON tm.id=mb.type_marchandise_id JOIN bateaux b ON b.id = mb.bateau_id WHERE mb.mouvement='entree' AND mb.poids IS NOT NULL AND b.date_entree BETWEEN ? AND ?" . ($typeId ? " AND mb.type_marchandise_id = ?" : "") . " GROUP BY t");
+        $params = [$month_start, $month_end]; if ($typeId) { $params[] = $typeId; }
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($month_type_map[$t])) $month_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $month_type_map[$t]['entree'] += $s; }
+    }
+    if ($mouvement === 'tous' || $mouvement === 'sortie') {
+        $stmt = $db->prepare("SELECT tm.nom t, SUM(mb.poids) s FROM marchandises_bateaux mb JOIN types_marchandises tm ON tm.id=mb.type_marchandise_id JOIN bateaux b ON b.id = mb.bateau_id WHERE mb.mouvement='sortie' AND mb.poids IS NOT NULL AND b.date_sortie BETWEEN ? AND ?" . ($typeId ? " AND mb.type_marchandise_id = ?" : "") . " GROUP BY t");
+        $params = [$month_start, $month_end]; if ($typeId) { $params[] = $typeId; }
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($month_type_map[$t])) $month_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $month_type_map[$t]['sortie'] += $s; }
+    }
+}
 
 // Préparer séries pour Chart.js (mois)
 ksort($month_type_map, SORT_NATURAL | SORT_FLAG_CASE);
@@ -177,39 +227,51 @@ $month_type_labels = array_keys($month_type_map);
 $month_type_entrees = array_map(fn($v)=>round((float)$v['entree'],2), array_values($month_type_map));
 $month_type_sorties = array_map(fn($v)=>round((float)$v['sortie'],2), array_values($month_type_map));
 
-// Répartition par type pour l'année courante (ignorer les filtres de recherche)
-$current_year = (int)date('Y');
+// Répartition par type pour l'année de recherche (respecte filtres)
+$current_year = (int)$start_date->format('Y');
 $year_type_map = [];
-// Camions - Entrée (année)
-$stmt = $db->prepare("SELECT tm.nom t, SUM(mc.poids) s
-    FROM marchandises_camions mc
-    JOIN types_marchandises tm ON tm.id = mc.type_marchandise_id
-    JOIN camions c ON c.id = mc.camion_id
-    WHERE (mc.mouvement IS NULL OR mc.mouvement = 'entree')
-      AND mc.poids IS NOT NULL
-      AND YEAR(c.date_entree) = ?
-    GROUP BY t");
-$stmt->execute([$current_year]);
-foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($year_type_map[$t])) $year_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $year_type_map[$t]['entree'] += $s; }
-// Camions - Sortie (année)
-$stmt = $db->prepare("SELECT tm.nom t, SUM(mc.poids) s
-    FROM marchandises_camions mc
-    JOIN types_marchandises tm ON tm.id = mc.type_marchandise_id
-    JOIN camions c ON c.id = mc.camion_id
-    WHERE mc.mouvement = 'sortie'
-      AND mc.poids IS NOT NULL
-      AND YEAR(c.date_sortie) = ?
-    GROUP BY t");
-$stmt->execute([$current_year]);
-foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($year_type_map[$t])) $year_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $year_type_map[$t]['sortie'] += $s; }
-// Bateaux - Entrée (année)
-$stmt = $db->prepare("SELECT tm.nom t, SUM(mb.poids) s FROM marchandises_bateaux mb JOIN types_marchandises tm ON tm.id=mb.type_marchandise_id WHERE mb.mouvement='entree' AND mb.poids IS NOT NULL AND YEAR(mb.created_at)=? GROUP BY t");
-$stmt->execute([$current_year]);
-foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($year_type_map[$t])) $year_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $year_type_map[$t]['entree'] += $s; }
-// Bateaux - Sortie (année)
-$stmt = $db->prepare("SELECT tm.nom t, SUM(mb.poids) s FROM marchandises_bateaux mb JOIN types_marchandises tm ON tm.id=mb.type_marchandise_id WHERE mb.mouvement='sortie' AND mb.poids IS NOT NULL AND YEAR(mb.created_at)=? GROUP BY t");
-$stmt->execute([$current_year]);
-foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($year_type_map[$t])) $year_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $year_type_map[$t]['sortie'] += $s; }
+if ($mode === 'tous' || $mode === 'camion') {
+    if ($mouvement === 'tous' || $mouvement === 'entree') {
+        $stmt = $db->prepare("SELECT tm.nom t, SUM(mc.poids) s
+            FROM marchandises_camions mc
+            JOIN types_marchandises tm ON tm.id = mc.type_marchandise_id
+            JOIN camions c ON c.id = mc.camion_id
+            WHERE (mc.mouvement IS NULL OR mc.mouvement = 'entree')
+              AND mc.poids IS NOT NULL
+              AND YEAR(c.date_entree) = ?" . ($typeId ? " AND mc.type_marchandise_id = ?" : "") . "
+            GROUP BY t");
+        $params = [$current_year]; if ($typeId) { $params[] = $typeId; }
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($year_type_map[$t])) $year_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $year_type_map[$t]['entree'] += $s; }
+    }
+    if ($mouvement === 'tous' || $mouvement === 'sortie') {
+        $stmt = $db->prepare("SELECT tm.nom t, SUM(mc.poids) s
+            FROM marchandises_camions mc
+            JOIN types_marchandises tm ON tm.id = mc.type_marchandise_id
+            JOIN camions c ON c.id = mc.camion_id
+            WHERE mc.mouvement = 'sortie'
+              AND mc.poids IS NOT NULL
+              AND YEAR(c.date_sortie) = ?" . ($typeId ? " AND mc.type_marchandise_id = ?" : "") . "
+            GROUP BY t");
+        $params = [$current_year]; if ($typeId) { $params[] = $typeId; }
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($year_type_map[$t])) $year_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $year_type_map[$t]['sortie'] += $s; }
+    }
+}
+if ($mode === 'tous' || $mode === 'bateau') {
+    if ($mouvement === 'tous' || $mouvement === 'entree') {
+        $stmt = $db->prepare("SELECT tm.nom t, SUM(mb.poids) s FROM marchandises_bateaux mb JOIN types_marchandises tm ON tm.id=mb.type_marchandise_id JOIN bateaux b ON b.id=mb.bateau_id WHERE mb.mouvement='entree' AND mb.poids IS NOT NULL AND YEAR(b.date_entree)=?" . ($typeId ? " AND mb.type_marchandise_id = ?" : "") . " GROUP BY t");
+        $params = [$current_year]; if ($typeId) { $params[] = $typeId; }
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($year_type_map[$t])) $year_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $year_type_map[$t]['entree'] += $s; }
+    }
+    if ($mouvement === 'tous' || $mouvement === 'sortie') {
+        $stmt = $db->prepare("SELECT tm.nom t, SUM(mb.poids) s FROM marchandises_bateaux mb JOIN types_marchandises tm ON tm.id=mb.type_marchandise_id JOIN bateaux b ON b.id=mb.bateau_id WHERE mb.mouvement='sortie' AND mb.poids IS NOT NULL AND YEAR(b.date_sortie)=?" . ($typeId ? " AND mb.type_marchandise_id = ?" : "") . " GROUP BY t");
+        $params = [$current_year]; if ($typeId) { $params[] = $typeId; }
+        $stmt->execute($params);
+        foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($year_type_map[$t])) $year_type_map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $year_type_map[$t]['sortie'] += $s; }
+    }
+}
 
 // Préparer séries pour Chart.js (année)
 ksort($year_type_map, SORT_NATURAL | SORT_FLAG_CASE);
@@ -291,7 +353,7 @@ $year_type_sorties = array_map(fn($v)=>round((float)$v['sortie'],2), array_value
                 <p class="text-gray-600 mt-2">Statistiques et surveillance du port</p>
             </div>
 
-            <form class="bg-white rounded-lg shadow p-6 mb-8 grid grid-cols-1 md:grid-cols-4 gap-4" method="get">
+            <form class="bg-white rounded-lg shadow p-6 mb-8 grid grid-cols-1 md:grid-cols-6 gap-4" method="get">
                 <div>
                     <label class="block text-sm text-gray-600 mb-1">Début</label>
                     <input type="date" name="start" value="<?= htmlspecialchars($start_date->format('Y-m-d')) ?>" class="w-full border rounded px-3 py-2" />
@@ -308,8 +370,35 @@ $year_type_sorties = array_map(fn($v)=>round((float)$v['sortie'],2), array_value
                         <?php endfor; ?>
                     </select>
                 </div>
-                <div class="flex items-end">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Mode</label>
+                    <select name="mode" class="w-full border rounded px-3 py-2">
+                        <option value="tous" <?= $mode==='tous'?'selected':''; ?>>Tous</option>
+                        <option value="camion" <?= $mode==='camion'?'selected':''; ?>>Camions</option>
+                        <option value="bateau" <?= $mode==='bateau'?'selected':''; ?>>Bateaux</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Mouvement</label>
+                    <select name="mouvement" class="w-full border rounded px-3 py-2">
+                        <option value="tous" <?= $mouvement==='tous'?'selected':''; ?>>Tous</option>
+                        <option value="entree" <?= $mouvement==='entree'?'selected':''; ?>>Entrée</option>
+                        <option value="sortie" <?= $mouvement==='sortie'?'selected':''; ?>>Sortie</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Type de marchandise</label>
+                    <select name="type_id" class="w-full border rounded px-3 py-2">
+                        <option value="">Tous</option>
+                        <?php
+                        try { $typesStmt = $db->query("SELECT id, nom FROM types_marchandises ORDER BY nom"); $typesList = $typesStmt->fetchAll(); } catch (Exception $e) { $typesList = []; }
+                        foreach ($typesList as $t) { $sel = ($typeId === (int)$t['id']) ? 'selected' : ''; echo '<option value="' . (int)$t['id'] . '" ' . $sel . '>' . htmlspecialchars($t['nom']) . '</option>'; }
+                        ?>
+                    </select>
+                </div>
+                <div class="flex items-end gap-2">
                     <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Appliquer</button>
+                    <a href="dashboard.php" class="px-4 py-2 bg-gray-100 text-gray-800 rounded border border-gray-300">Réinitialiser</a>
                 </div>
             </form>
 
@@ -468,10 +557,27 @@ $year_type_sorties = array_map(fn($v)=>round((float)$v['sortie'],2), array_value
 
         // Données injectées depuis PHP
         const months = <?= json_encode($monthLabels) ?>;
-        const dataCamionsEntree = <?= json_encode($series_camions_entrees) ?>;
-        const dataCamionsSortie = <?= json_encode($series_camions_sorties) ?>;
-        const dataBateauxEntree = <?= json_encode($series_bateaux_entrees) ?>;
-        const dataBateauxSortie = <?= json_encode($series_bateaux_sorties) ?>;
+        let dataCamionsEntree = <?= json_encode($series_camions_entrees) ?>;
+        let dataCamionsSortie = <?= json_encode($series_camions_sorties) ?>;
+        let dataBateauxEntree = <?= json_encode($series_bateaux_entrees) ?>;
+        let dataBateauxSortie = <?= json_encode($series_bateaux_sorties) ?>;
+        const mvFilter = <?= json_encode($mouvement) ?>;
+        const modeFilter = <?= json_encode($mode) ?>;
+        // Appliquer filtres mouvement et mode côté client (sécurité visuelle)
+        if (mvFilter === 'entree') {
+            dataCamionsSortie = dataCamionsSortie.map(() => 0);
+            dataBateauxSortie = dataBateauxSortie.map(() => 0);
+        } else if (mvFilter === 'sortie') {
+            dataCamionsEntree = dataCamionsEntree.map(() => 0);
+            dataBateauxEntree = dataBateauxEntree.map(() => 0);
+        }
+        if (modeFilter === 'camion') {
+            dataBateauxEntree = dataBateauxEntree.map(() => 0);
+            dataBateauxSortie = dataBateauxSortie.map(() => 0);
+        } else if (modeFilter === 'bateau') {
+            dataCamionsEntree = dataCamionsEntree.map(() => 0);
+            dataCamionsSortie = dataCamionsSortie.map(() => 0);
+        }
 
         const annualMonths = <?= json_encode($annualMonthLabels) ?>;
         const yearLabel = <?= json_encode($year_for_annual) ?>;

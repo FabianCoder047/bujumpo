@@ -825,83 +825,142 @@ function generatePDF($data, $columns, $title, $filename) {
                     <div class="bg-white rounded-lg shadow p-6">
                         <h3 class="text-lg font-semibold text-gray-900 mb-1">Rapport rapide</h3>
                         <p class="text-gray-600 text-sm mb-4">Tonnage par type — Mois courant</p>
-                        <div class="flex gap-3">
-                            <a target="_blank" href="api/export_rapport.php?report=tonnage_type&scope=month&format=pdf" class="inline-flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded">
-                                <i class="fas fa-file-pdf mr-2"></i> PDF
-                            </a>
-                            <a target="_blank" href="api/export_rapport.php?report=tonnage_type&scope=month&format=xlsx" class="inline-flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded">
-                                <i class="fas fa-file-excel mr-2"></i> Excel
-                            </a>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-1">Rapport rapide</h3>
-                        <p class="text-gray-600 text-sm mb-4">Tonnage par type — Année courante</p>
-                        <div class="flex gap-3">
-                            <a target="_blank" href="api/export_rapport.php?report=tonnage_type&scope=year&format=pdf" class="inline-flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded">
-                                <i class="fas fa-file-pdf mr-2"></i> PDF
-                            </a>
-                            <a target="_blank" href="api/export_rapport.php?report=tonnage_type&scope=year&format=xlsx" class="inline-flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded">
-                                <i class="fas fa-file-excel mr-2"></i> Excel
-                            </a>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-1">Rapport personnalisé</h3>
-                        <p class="text-gray-600 text-sm mb-4">Tonnage par type — Période au choix</p>
-                        <form id="customTonnageForm" method="get" action="api/export_rapport.php" target="_blank" class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                        <form method="get" action="api/export_rapport.php" target="_blank" class="grid grid-cols-1 md:grid-cols-6 gap-3">
                             <input type="hidden" name="report" value="tonnage_type" />
-                            <input type="hidden" name="scope" value="custom" />
+                            <input type="hidden" name="scope" value="month" />
                             <div class="md:col-span-2">
-                                <label class="block text-sm text-gray-600 mb-1">Début</label>
-                                <input name="start" type="date" class="w-full border rounded px-3 py-2" required />
+                                <label class="block text-sm text-gray-600 mb-1">Mode</label>
+                                <select name="mode" class="w-full border rounded px-3 py-2">
+                                    <option value="tous">Tous</option>
+                                    <option value="camion">Camions</option>
+                                    <option value="bateau">Bateaux</option>
+                                </select>
                             </div>
                             <div class="md:col-span-2">
-                                <label class="block text-sm text-gray-600 mb-1">Fin</label>
-                                <input name="end" type="date" class="w-full border rounded px-3 py-2" required />
+                                <label class="block text-sm text-gray-600 mb-1">Mouvement</label>
+                                <select name="mouvement" class="w-full border rounded px-3 py-2">
+                                    <option value="tous">Tous</option>
+                                    <option value="entree">Entrée</option>
+                                    <option value="sortie">Sortie</option>
+                                </select>
                             </div>
-                            <div class="md:col-span-2 flex items-end gap-3 flex-wrap">
-                                <button name="format" value="pdf" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded inline-flex items-center whitespace-nowrap"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
-                                <button name="format" value="xlsx" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded inline-flex items-center whitespace-nowrap"><i class="fas fa-file-excel mr-2"></i>Excel</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Rapport par type spécifique -->
-                <div class="mt-8 mb-10 grid grid-cols-1 gap-6">
-                    <div class="bg-white rounded-lg shadow p-6">
-                        <h3 class="text-lg font-semibold text-gray-900 mb-1">Rapport par type spécifique</h3>
-                        <p class="text-gray-600 text-sm mb-4">Sélectionnez un type de marchandise et une période</p>
-                        <form id="customTypeForm" method="get" action="api/export_rapport.php" target="_blank" class="grid grid-cols-1 md:grid-cols-6 gap-3">
-                            <input type="hidden" name="report" value="tonnage_type" />
-                            <input type="hidden" name="scope" value="custom" />
                             <div class="md:col-span-2">
-                                <label class="block text-sm text-gray-600 mb-1">Type de marchandise</label>
-                                <select name="type_id" class="w-full border rounded px-3 py-2" required>
-                                    <option value="" disabled selected>Choisir un type</option>
+                                <label class="block text-sm text-gray-600 mb-1">Type</label>
+                                <select name="type_id" class="w-full border rounded px-3 py-2">
+                                    <option value="">Tous</option>
                                     <?php foreach ($types as $t): ?>
                                         <option value="<?= (int)$t['id'] ?>"><?= htmlspecialchars($t['nom']) ?></option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
+                            <div class="md:col-span-6 flex items-center gap-3 flex-wrap mt-1">
+                                <button name="format" value="pdf" class="inline-flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded">
+                                    <i class="fas fa-file-pdf mr-2"></i> PDF
+                                </button>
+                                <button name="format" value="xlsx" class="inline-flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded">
+                                    <i class="fas fa-file-excel mr-2"></i> Excel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-1">Rapport rapide</h3>
+                        <p class="text-gray-600 text-sm mb-4">Tonnage par type — Année courante</p>
+                        <form method="get" action="api/export_rapport.php" target="_blank" class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                            <input type="hidden" name="report" value="tonnage_type" />
+                            <input type="hidden" name="scope" value="year" />
                             <div class="md:col-span-2">
-                                <label class="block text-sm text-gray-600 mb-1">Début</label>
-                                <input name="start" type="date" class="w-full border rounded px-3 py-2" required />
+                                <label class="block text-sm text-gray-600 mb-1">Mode</label>
+                                <select name="mode" class="w-full border rounded px-3 py-2">
+                                    <option value="tous">Tous</option>
+                                    <option value="camion">Camions</option>
+                                    <option value="bateau">Bateaux</option>
+                                </select>
                             </div>
                             <div class="md:col-span-2">
-                                <label class="block text-sm text-gray-600 mb-1">Fin</label>
-                                <input name="end" type="date" class="w-full border rounded px-3 py-2" required />
+                                <label class="block text-sm text-gray-600 mb-1">Mouvement</label>
+                                <select name="mouvement" class="w-full border rounded px-3 py-2">
+                                    <option value="tous">Tous</option>
+                                    <option value="entree">Entrée</option>
+                                    <option value="sortie">Sortie</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-sm text-gray-600 mb-1">Type</label>
+                                <select name="type_id" class="w-full border rounded px-3 py-2">
+                                    <option value="">Tous</option>
+                                    <?php foreach ($types as $t): ?>
+                                        <option value="<?= (int)$t['id'] ?>"><?= htmlspecialchars($t['nom']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
                             </div>
                             <div class="md:col-span-6 flex items-center gap-3 flex-wrap mt-1">
+                                <button name="format" value="pdf" class="inline-flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded">
+                                    <i class="fas fa-file-pdf mr-2"></i> PDF
+                                </button>
+                                <button name="format" value="xlsx" class="inline-flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded">
+                                    <i class="fas fa-file-excel mr-2"></i> Excel
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-1">Rapport personnalisé</h3>
+                        <p class="text-gray-600 text-sm mb-4">Tonnage par type — Période au choix</p>
+                        <form id="customTonnageForm" method="get" action="api/export_rapport.php" target="_blank" class="space-y-4 js-check-export">
+                            <input type="hidden" name="report" value="tonnage_type" />
+                            <input type="hidden" name="scope" value="custom" />
+                            <!-- Row 1: Dates -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Début</label>
+                                    <input name="start" type="date" class="w-full border rounded px-3 py-2" required />
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Fin</label>
+                                    <input name="end" type="date" class="w-full border rounded px-3 py-2" required />
+                                </div>
+                            </div>
+                            <!-- Row 2: Filtres -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Mode</label>
+                                    <select name="mode" class="w-full border rounded px-3 py-2">
+                                        <option value="tous">Tous</option>
+                                        <option value="camion">Camions</option>
+                                        <option value="bateau">Bateaux</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Mouvement</label>
+                                    <select name="mouvement" class="w-full border rounded px-3 py-2">
+                                        <option value="tous">Tous</option>
+                                        <option value="entree">Entrée</option>
+                                        <option value="sortie">Sortie</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-gray-600 mb-1">Type</label>
+                                    <select name="type_id" class="w-full border rounded px-3 py-2">
+                                        <option value="">Tous</option>
+                                        <?php foreach ($types as $t): ?>
+                                            <option value="<?= (int)$t['id'] ?>"><?= htmlspecialchars($t['nom']) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                            <!-- Row 3: Boutons -->
+                            <div class="flex items-center gap-3 justify-end">
                                 <button name="format" value="pdf" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded inline-flex items-center whitespace-nowrap"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
                                 <button name="format" value="xlsx" class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded inline-flex items-center whitespace-nowrap"><i class="fas fa-file-excel mr-2"></i>Excel</button>
                             </div>
                         </form>
                     </div>
                 </div>
+
+                
 
                 <!-- Rapports détaillés — Camions et Bateaux -->
                 <div class="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -917,6 +976,16 @@ function generatePDF($data, $columns, $title, $filename) {
                                     <select name="scope" class="border rounded px-2 py-1 text-sm">
                                         <option value="month">Mois courant</option>
                                         <option value="year">Année courante</option>
+                                        <option value="custom">Personnalisée</option>
+                                    </select>
+                                    <input type="date" name="start" class="border rounded px-2 py-1 text-sm" />
+                                    <input type="date" name="end" class="border rounded px-2 py-1 text-sm" />
+                                    <label class="text-sm text-gray-700">Type</label>
+                                    <select name="type_id" class="border rounded px-2 py-1 text-sm">
+                                        <option value="">Tous</option>
+                                        <?php foreach ($types as $t): ?>
+                                            <option value="<?= (int)$t['id'] ?>"><?= htmlspecialchars($t['nom']) ?></option>
+                                        <?php endforeach; ?>
                                     </select>
                                     <button name="format" value="pdf" class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded inline-flex items-center whitespace-nowrap"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
                                     <button name="format" value="xlsx" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded inline-flex items-center whitespace-nowrap"><i class="fas fa-file-excel mr-2"></i>Excel</button>
@@ -930,6 +999,16 @@ function generatePDF($data, $columns, $title, $filename) {
                                     <select name="scope" class="border rounded px-2 py-1 text-sm">
                                         <option value="month">Mois courant</option>
                                         <option value="year">Année courante</option>
+                                        <option value="custom">Personnalisée</option>
+                                    </select>
+                                    <input type="date" name="start" class="border rounded px-2 py-1 text-sm" />
+                                    <input type="date" name="end" class="border rounded px-2 py-1 text-sm" />
+                                    <label class="text-sm text-gray-700">Type</label>
+                                    <select name="type_id" class="border rounded px-2 py-1 text-sm">
+                                        <option value="">Tous</option>
+                                        <?php foreach ($types as $t): ?>
+                                            <option value="<?= (int)$t['id'] ?>"><?= htmlspecialchars($t['nom']) ?></option>
+                                        <?php endforeach; ?>
                                     </select>
                                     <button name="format" value="pdf" class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded inline-flex items-center whitespace-nowrap"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
                                     <button name="format" value="xlsx" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded inline-flex items-center whitespace-nowrap"><i class="fas fa-file-excel mr-2"></i>Excel</button>
@@ -950,6 +1029,16 @@ function generatePDF($data, $columns, $title, $filename) {
                                     <select name="scope" class="border rounded px-2 py-1 text-sm">
                                         <option value="month">Mois courant</option>
                                         <option value="year">Année courante</option>
+                                        <option value="custom">Personnalisée</option>
+                                    </select>
+                                    <input type="date" name="start" class="border rounded px-2 py-1 text-sm" />
+                                    <input type="date" name="end" class="border rounded px-2 py-1 text-sm" />
+                                    <label class="text-sm text-gray-700">Type</label>
+                                    <select name="type_id" class="border rounded px-2 py-1 text-sm">
+                                        <option value="">Tous</option>
+                                        <?php foreach ($types as $t): ?>
+                                            <option value="<?= (int)$t['id'] ?>"><?= htmlspecialchars($t['nom']) ?></option>
+                                        <?php endforeach; ?>
                                     </select>
                                     <button name="format" value="pdf" class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded inline-flex items-center whitespace-nowrap"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
                                     <button name="format" value="xlsx" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded inline-flex items-center whitespace-nowrap"><i class="fas fa-file-excel mr-2"></i>Excel</button>
@@ -963,6 +1052,16 @@ function generatePDF($data, $columns, $title, $filename) {
                                     <select name="scope" class="border rounded px-2 py-1 text-sm">
                                         <option value="month">Mois courant</option>
                                         <option value="year">Année courante</option>
+                                        <option value="custom">Personnalisée</option>
+                                    </select>
+                                    <input type="date" name="start" class="border rounded px-2 py-1 text-sm" />
+                                    <input type="date" name="end" class="border rounded px-2 py-1 text-sm" />
+                                    <label class="text-sm text-gray-700">Type</label>
+                                    <select name="type_id" class="border rounded px-2 py-1 text-sm">
+                                        <option value="">Tous</option>
+                                        <?php foreach ($types as $t): ?>
+                                            <option value="<?= (int)$t['id'] ?>"><?= htmlspecialchars($t['nom']) ?></option>
+                                        <?php endforeach; ?>
                                     </select>
                                     <button name="format" value="pdf" class="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded inline-flex items-center whitespace-nowrap"><i class="fas fa-file-pdf mr-2"></i>PDF</button>
                                     <button name="format" value="xlsx" class="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded inline-flex items-center whitespace-nowrap"><i class="fas fa-file-excel mr-2"></i>Excel</button>
@@ -1116,6 +1215,40 @@ function generatePDF($data, $columns, $title, $filename) {
             </div>
         </main>
     </div>
+
+    <script>
+    (function(){
+        function serialize(form){
+            const params = [];
+            new FormData(form).forEach((v,k)=>{ if(v!==null) params.push(encodeURIComponent(k)+'='+encodeURIComponent(v)); });
+            return params.join('&');
+        }
+        document.querySelectorAll('form.js-check-export').forEach(function(form){
+            form.addEventListener('submit', async function(e){
+                e.preventDefault();
+                const btn = e.submitter; // PDF or XLSX
+                if (!btn) return;
+                const format = btn.getAttribute('value') || 'pdf';
+                const base = form.getAttribute('action');
+                const qs = serialize(form);
+                const url = base + '?' + qs + '&format=' + encodeURIComponent(format) + '&check=1';
+                try {
+                    const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                    const data = await res.json();
+                    if (!data || !data.hasData) {
+                        alert('Aucune donnée pour cette recherche. Le rapport serait vide.');
+                        return;
+                    }
+                    // open actual export
+                    const finalUrl = base + '?' + qs + '&format=' + encodeURIComponent(format);
+                    window.open(finalUrl, '_blank');
+                } catch(err){
+                    alert('Impossible de vérifier le rapport. Réessayez.');
+                }
+            });
+        });
+    })();
+    </script>
 
     <script>
         function toggleSidebar() {

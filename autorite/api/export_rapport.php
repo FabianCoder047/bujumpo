@@ -19,6 +19,9 @@ $year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
 $checkOnly = isset($_GET['check']) && $_GET['check'] == '1';
 // Filtre optionnel sur un type de marchandise spécifique
 $typeId = isset($_GET['type_id']) ? (int)$_GET['type_id'] : null;
+// Filtres optionnels supplémentaires
+$mouvement = isset($_GET['mouvement']) && in_array($_GET['mouvement'], ['entree','sortie','tous'], true) ? $_GET['mouvement'] : 'tous';
+$mode = isset($_GET['mode']) && in_array($_GET['mode'], ['camion','bateau','tous'], true) ? $_GET['mode'] : 'tous';
 
 // Générateur de périmètre temporel
 function build_scope($scope, $start, $end, $year, $prefix, &$params) {
@@ -74,7 +77,7 @@ function fetch_frais_transit($db, $scope, $start, $end, $year) {
     return $all;
 }
 
-function fetch_tonnage_type($db, $scope, $start, $end, $year, $typeId = null) {
+function fetch_tonnage_type($db, $scope, $start, $end, $year, $typeId = null, $mouvement = 'tous', $mode = 'tous') {
     $map = [];
     if ($scope === 'month') {
         $start = date('Y-m-01 00:00:00');
@@ -96,32 +99,41 @@ function fetch_tonnage_type($db, $scope, $start, $end, $year, $typeId = null) {
         $params = [$start, $end];
     }
 
-    // Camions entree
-    $sql = "SELECT tm.nom t, SUM(mc.poids) s FROM marchandises_camions mc JOIN types_marchandises tm ON tm.id=mc.type_marchandise_id WHERE mc.mouvement='entree' AND mc.poids IS NOT NULL AND $whereMC" . ($typeId ? " AND tm.id=?" : "") . " GROUP BY t";
-    $stmt = $db->prepare($sql);
-    $stmt->execute($typeId ? array_merge($params, [$typeId]) : $params);
-    foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($map[$t])) $map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $map[$t]['entree'] += $s; }
-    // Camions sortie
-    $sql = "SELECT tm.nom t, SUM(mc.poids) s FROM marchandises_camions mc JOIN types_marchandises tm ON tm.id=mc.type_marchandise_id WHERE mc.mouvement='sortie' AND mc.poids IS NOT NULL AND $whereMC" . ($typeId ? " AND tm.id=?" : "") . " GROUP BY t";
-    $stmt = $db->prepare($sql);
-    $stmt->execute($typeId ? array_merge($params, [$typeId]) : $params);
-    foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($map[$t])) $map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $map[$t]['sortie'] += $s; }
-    // Bateaux entree
-    $sql = "SELECT tm.nom t, SUM(mb.poids) s FROM marchandises_bateaux mb JOIN types_marchandises tm ON tm.id=mb.type_marchandise_id WHERE mb.mouvement='entree' AND mb.poids IS NOT NULL AND $whereMB" . ($typeId ? " AND tm.id=?" : "") . " GROUP BY t";
-    $stmt = $db->prepare($sql);
-    $stmt->execute($typeId ? array_merge($params, [$typeId]) : $params);
-    foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($map[$t])) $map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $map[$t]['entree'] += $s; }
-    // Bateaux sortie
-    $sql = "SELECT tm.nom t, SUM(mb.poids) s FROM marchandises_bateaux mb JOIN types_marchandises tm ON tm.id=mb.type_marchandise_id WHERE mb.mouvement='sortie' AND mb.poids IS NOT NULL AND $whereMB" . ($typeId ? " AND tm.id=?" : "") . " GROUP BY t";
-    $stmt = $db->prepare($sql);
-    $stmt->execute($typeId ? array_merge($params, [$typeId]) : $params);
-    foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($map[$t])) $map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $map[$t]['sortie'] += $s; }
+    $includeCamions = ($mode === 'tous' || $mode === 'camion');
+    $includeBateaux = ($mode === 'tous' || $mode === 'bateau');
+    $doEntree = ($mouvement === 'tous' || $mouvement === 'entree');
+    $doSortie = ($mouvement === 'tous' || $mouvement === 'sortie');
+
+    if ($includeCamions && $doEntree) {
+        $sql = "SELECT tm.nom t, SUM(mc.poids) s FROM marchandises_camions mc JOIN types_marchandises tm ON tm.id=mc.type_marchandise_id WHERE mc.mouvement='entree' AND mc.poids IS NOT NULL AND $whereMC" . ($typeId ? " AND tm.id=?" : "") . " GROUP BY t";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($typeId ? array_merge($params, [$typeId]) : $params);
+        foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($map[$t])) $map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $map[$t]['entree'] += $s; }
+    }
+    if ($includeCamions && $doSortie) {
+        $sql = "SELECT tm.nom t, SUM(mc.poids) s FROM marchandises_camions mc JOIN types_marchandises tm ON tm.id=mc.type_marchandise_id WHERE mc.mouvement='sortie' AND mc.poids IS NOT NULL AND $whereMC" . ($typeId ? " AND tm.id=?" : "") . " GROUP BY t";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($typeId ? array_merge($params, [$typeId]) : $params);
+        foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($map[$t])) $map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $map[$t]['sortie'] += $s; }
+    }
+    if ($includeBateaux && $doEntree) {
+        $sql = "SELECT tm.nom t, SUM(mb.poids) s FROM marchandises_bateaux mb JOIN types_marchandises tm ON tm.id=mb.type_marchandise_id WHERE mb.mouvement='entree' AND mb.poids IS NOT NULL AND $whereMB" . ($typeId ? " AND tm.id=?" : "") . " GROUP BY t";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($typeId ? array_merge($params, [$typeId]) : $params);
+        foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($map[$t])) $map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $map[$t]['entree'] += $s; }
+    }
+    if ($includeBateaux && $doSortie) {
+        $sql = "SELECT tm.nom t, SUM(mb.poids) s FROM marchandises_bateaux mb JOIN types_marchandises tm ON tm.id=mb.type_marchandise_id WHERE mb.mouvement='sortie' AND mb.poids IS NOT NULL AND $whereMB" . ($typeId ? " AND tm.id=?" : "") . " GROUP BY t";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($typeId ? array_merge($params, [$typeId]) : $params);
+        foreach ($stmt->fetchAll() as $r) { $t=$r['t']; $s=(float)$r['s']; if(!isset($map[$t])) $map[$t] = ['entree'=>0.0,'sortie'=>0.0]; $map[$t]['sortie'] += $s; }
+    }
 
     ksort($map, SORT_NATURAL | SORT_FLAG_CASE);
     return $map;
 }
 
-function fetch_camions($db, $scope, $start, $end, $year, $which) {
+function fetch_camions($db, $scope, $start, $end, $year, $which, $typeId = null) {
     // $which : 'entree' ou 'sortie'
     $params = [];
     $cond = build_scope($scope, $start, $end, $year, $which === 'entree' ? 'c.date_entree' : 'c.date_sortie', $params);
@@ -133,14 +145,23 @@ function fetch_camions($db, $scope, $start, $end, $year, $which) {
             FROM camions c
             LEFT JOIN types_camions tc ON tc.id = c.type_camion_id
             LEFT JOIN ports p ON p.id = c.provenance_port_id
-            WHERE $cond AND c." . ($which === 'entree' ? "date_entree IS NOT NULL" : "date_sortie IS NOT NULL") . "
+            WHERE $cond AND c." . ($which === 'entree' ? "date_entree IS NOT NULL" : "date_sortie IS NOT NULL") . (
+                $typeId ? " AND EXISTS (SELECT 1 FROM marchandises_camions mc2 WHERE mc2.camion_id=c.id AND mc2.type_marchandise_id = :type_filter)" : ""
+            ) . "
             ORDER BY " . ($which === 'entree' ? 'c.date_entree' : 'c.date_sortie') . " ASC";
     $stmt = $db->prepare($sql);
-    $stmt->execute($params);
+    if ($typeId) {
+        $stmt = $db->prepare(str_replace(':type_filter', '?', $sql));
+        $execParams = $params;
+        $execParams[] = $typeId;
+        $stmt->execute($execParams);
+    } else {
+        $stmt->execute($params);
+    }
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-function fetch_bateaux($db, $scope, $start, $end, $year, $which) {
+function fetch_bateaux($db, $scope, $start, $end, $year, $which, $typeId = null) {
     $params = [];
     $cond = build_scope($scope, $start, $end, $year, $which === 'entree' ? 'b.date_entree' : 'b.date_sortie', $params);
     $sql = "SELECT b.id, tb.nom AS type_bateau, b.nom, b.immatriculation, b.capitaine, b.agence,
@@ -153,21 +174,30 @@ function fetch_bateaux($db, $scope, $start, $end, $year, $which) {
             LEFT JOIN types_bateaux tb ON tb.id = b.type_bateau_id
             LEFT JOIN ports po ON po.id = b.port_origine_id
             LEFT JOIN ports pd ON pd.id = b.port_destination_id
-            WHERE $cond AND b." . ($which === 'entree' ? "date_entree IS NOT NULL" : "date_sortie IS NOT NULL") . "
+            WHERE $cond AND b." . ($which === 'entree' ? "date_entree IS NOT NULL" : "date_sortie IS NOT NULL") . (
+                $typeId ? " AND EXISTS (SELECT 1 FROM marchandises_bateaux mb2 WHERE mb2.bateau_id=b.id AND mb2.type_marchandise_id = :type_filter)" : ""
+            ) . "
             ORDER BY " . ($which === 'entree' ? 'b.date_entree' : 'b.date_sortie') . " ASC";
     $stmt = $db->prepare($sql);
-    $stmt->execute($params);
+    if ($typeId) {
+        $stmt = $db->prepare(str_replace(':type_filter', '?', $sql));
+        $execParams = $params;
+        $execParams[] = $typeId;
+        $stmt->execute($execParams);
+    } else {
+        $stmt->execute($params);
+    }
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 // Routeur
 if ($report === 'tonnage_type') {
-    $data = fetch_tonnage_type($db, $scope, $start, $end, $year, $typeId);
+    $data = fetch_tonnage_type($db, $scope, $start, $end, $year, $typeId, $mouvement, $mode);
     $title = 'Tonnage par type' . ($typeId ? ' (type spécifique)' : '') . ' - ' . ($scope === 'month' ? 'Mois courant' : ($scope === 'year' ? ('Année ' . $year) : ('Période ' . substr($start,0,10) . ' au ' . substr($end,0,10))));
 } elseif (in_array($report, ['camions_entree','camions_sortie','bateaux_entree','bateaux_sortie'], true)) {
     $which = str_contains($report, 'entree') ? 'entree' : 'sortie';
     $isCamion = str_starts_with($report, 'camions');
-    $data = $isCamion ? fetch_camions($db, $scope, $start, $end, $year, $which) : fetch_bateaux($db, $scope, $start, $end, $year, $which);
+    $data = $isCamion ? fetch_camions($db, $scope, $start, $end, $year, $which, $typeId) : fetch_bateaux($db, $scope, $start, $end, $year, $which, $typeId);
     $title = ($isCamion ? 'Camions ' : 'Bateaux ') . ($which === 'entree' ? 'entrés' : 'sortis') . ' - ' . ($scope === 'month' ? 'Mois courant' : ($scope === 'year' ? ('Année ' . $year) : ('Période ' . substr($start,0,10) . ' au ' . substr($end,0,10))));
 } elseif ($report === 'frais_transit') {
     $data = fetch_frais_transit($db, $scope, $start, $end, $year);
@@ -175,6 +205,21 @@ if ($report === 'tonnage_type') {
 } else {
     http_response_code(400);
     echo 'Report inconnu';
+    exit;
+}
+
+// Pré-check: si check=1, renvoyer uniquement s'il y a des données
+if ($checkOnly) {
+    $has = false;
+    if ($report === 'tonnage_type' && is_array($data)) {
+        foreach ($data as $row) {
+            if ((($row['entree'] ?? 0) > 0) || (($row['sortie'] ?? 0) > 0)) { $has = true; break; }
+        }
+    } elseif (is_array($data)) {
+        $has = count($data) > 0;
+    }
+    header('Content-Type: application/json');
+    echo json_encode(['hasData' => $has]);
     exit;
 }
 
