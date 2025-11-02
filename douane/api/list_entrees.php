@@ -12,6 +12,9 @@ try {
     $start = isset($_GET['start']) ? ($_GET['start'] . ' 00:00:00') : null;
     $end = isset($_GET['end']) ? ($_GET['end'] . ' 23:59:59') : null;
     $year = isset($_GET['year']) ? (int)$_GET['year'] : (int)date('Y');
+    // Pagination
+    $perPage = isset($_GET['per_page']) && (int)$_GET['per_page'] > 0 ? min((int)$_GET['per_page'], 100) : 10;
+    $page = isset($_GET['page']) && (int)$_GET['page'] > 0 ? (int)$_GET['page'] : 1;
 
     $paramsC = [];
     $paramsB = [];
@@ -130,7 +133,21 @@ try {
         return strcmp((string)$b['date_entree'], (string)$a['date_entree']);
     });
 
-    echo json_encode(['success' => true, 'scope' => $scope, 'count' => count($data), 'items' => $data]);
+    $total = count($data);
+    $totalPages = max(1, (int)ceil($total / $perPage));
+    if ($page > $totalPages) { $page = $totalPages; }
+    $offset = ($page - 1) * $perPage;
+    $paged = array_slice($data, $offset, $perPage);
+
+    echo json_encode([
+        'success' => true,
+        'scope' => $scope,
+        'count' => $total,
+        'total_pages' => $totalPages,
+        'page' => $page,
+        'per_page' => $perPage,
+        'items' => array_values($paged)
+    ]);
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Erreur serveur: ' . $e->getMessage()]);

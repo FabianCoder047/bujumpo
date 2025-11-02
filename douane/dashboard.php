@@ -75,6 +75,18 @@ $user = getCurrentUser();
             </div>
           </div>
           <div class="mt-4 overflow-auto">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-sm text-gray-600" id="entriesMeta"></div>
+              <div class="flex items-center gap-2">
+                <label class="text-sm text-gray-600">Par page</label>
+                <select id="perPage" class="border rounded px-2 py-1 text-sm">
+                  <option value="10">10</option>
+                  <option value="25">25</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                </select>
+              </div>
+            </div>
             <table class="min-w-full border">
               <thead>
                 <tr class="bg-gray-50 text-left text-sm">
@@ -91,6 +103,15 @@ $user = getCurrentUser();
               <tbody id="entriesBody" class="text-sm"></tbody>
             </table>
             <p id="entriesEmpty" class="text-sm text-gray-500 mt-3 hidden">Aucune entrée trouvée pour la période.</p>
+            <div class="flex items-center justify-between mt-3">
+              <div class="text-sm text-gray-600" id="entriesPage"></div>
+              <div class="flex gap-2">
+                <button id="btnFirst" class="px-3 py-2 border rounded disabled:opacity-50" disabled>« Première</button>
+                <button id="btnPrev" class="px-3 py-2 border rounded disabled:opacity-50" disabled>‹ Précédente</button>
+                <button id="btnNext" class="px-3 py-2 border rounded disabled:opacity-50" disabled>Suivante ›</button>
+                <button id="btnLast" class="px-3 py-2 border rounded disabled:opacity-50" disabled>Dernière »</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -151,6 +172,13 @@ $user = getCurrentUser();
     const rangeFields = document.getElementById('rangeFields');
     const entriesBody = document.getElementById('entriesBody');
     const entriesEmpty = document.getElementById('entriesEmpty');
+    const perPageEl = document.getElementById('perPage');
+    const entriesMeta = document.getElementById('entriesMeta');
+    const entriesPage = document.getElementById('entriesPage');
+    const btnFirst = document.getElementById('btnFirst');
+    const btnPrev = document.getElementById('btnPrev');
+    const btnNext = document.getElementById('btnNext');
+    const btnLast = document.getElementById('btnLast');
     const selectedInfo = document.getElementById('selectedInfo');
     // Reset only fees fields
     function resetFees() {
@@ -160,6 +188,18 @@ $user = getCurrentUser();
       document.getElementById('surestaries').value = '';
       document.getElementById('status').textContent = '';
     }
+
+    function disablePager(){ btnFirst.disabled = btnPrev.disabled = btnNext.disabled = btnLast.disabled = true; }
+    function updatePager(){
+      btnFirst.disabled = btnPrev.disabled = (state.page <= 1);
+      btnNext.disabled = btnLast.disabled = (state.page >= state.total_pages);
+    }
+
+    perPageEl.addEventListener('change', () => { state.page = 1; fetchEntries(); });
+    btnFirst.addEventListener('click', (e)=>{ e.preventDefault(); if (state.page>1){ state.page = 1; fetchEntries(); }});
+    btnPrev.addEventListener('click', (e)=>{ e.preventDefault(); if (state.page>1){ state.page -= 1; fetchEntries(); }});
+    btnNext.addEventListener('click', (e)=>{ e.preventDefault(); if (state.page<state.total_pages){ state.page += 1; fetchEntries(); }});
+    btnLast.addEventListener('click', (e)=>{ e.preventDefault(); if (state.page<state.total_pages){ state.page = state.total_pages; fetchEntries(); }});
     // Full reset: also reset type and immatriculation
     function resetAll() {
       document.getElementById('type').value = 'camion';
@@ -219,8 +259,10 @@ $user = getCurrentUser();
       document.getElementById('surestaries').value = item.fees?.surestaries ?? '';
     }
 
+    let state = { page: 1, total_pages: 1, count: 0 };
+
     async function fetchEntries() {
-      let url = 'api/list_entrees.php?scope=' + encodeURIComponent(scopeEl.value);
+      let url = 'api/list_entrees.php?scope=' + encodeURIComponent(scopeEl.value) + '&per_page=' + encodeURIComponent(perPageEl.value) + '&page=' + encodeURIComponent(state.page);
       if (scopeEl.value === 'custom') {
         const s = document.getElementById('start').value;
         const e = document.getElementById('end').value;
@@ -229,11 +271,17 @@ $user = getCurrentUser();
       }
       const resp = await fetch(url);
       const data = await resp.json();
-      if (!data || !data.success) { entriesBody.innerHTML = ''; entriesEmpty.classList.remove('hidden'); return; }
+      if (!data || !data.success) { entriesBody.innerHTML = ''; entriesEmpty.classList.remove('hidden'); entriesMeta.textContent=''; entriesPage.textContent=''; disablePager(); return; }
       const items = data.items || [];
+      state.page = data.page || 1;
+      state.total_pages = data.total_pages || 1;
+      state.count = data.count || items.length;
       entriesBody.innerHTML = '';
-      if (items.length === 0) { entriesEmpty.classList.remove('hidden'); return; }
+      if (items.length === 0) { entriesEmpty.classList.remove('hidden'); entriesMeta.textContent = '0 résultat'; entriesPage.textContent=''; disablePager(); return; }
       entriesEmpty.classList.add('hidden');
+      entriesMeta.textContent = `${state.count} enregistrements`;
+      entriesPage.textContent = `Page ${state.page} / ${state.total_pages}`;
+      updatePager();
       for (const it of items) {
         const tr = document.createElement('tr');
         tr.innerHTML = `

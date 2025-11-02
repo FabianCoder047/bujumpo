@@ -6,6 +6,8 @@ require_once '../config/database.php';
 $user = getCurrentUser();
 $db = getDB();
 
+function h($v){ return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8'); }
+
 // Filtres
 $q = isset($_GET['q']) ? trim($_GET['q']) : '';
 $type_camion_id = isset($_GET['type_camion_id']) ? trim($_GET['type_camion_id']) : '';
@@ -256,7 +258,7 @@ $total_pages = max(1, (int)ceil($total / $per_page));
 if ($page > $total_pages) { $page = $total_pages; $offset = ($page - 1) * $per_page; }
 
 // Récupérer les données de la page
-$sql = $select . $whereSql . ' ORDER BY ' . $allowedSort[$sort] . ' ' . strtoupper($dir) . ' LIMIT ' . (int)$per_page . ' OFFSET ' . (int)$offset;
+$sql = $select . $whereSql . ' ORDER BY ' . $allowedSort[$sort] . ' ' . strtoupper($dir) . ', p.id DESC LIMIT ' . (int)$per_page . ' OFFSET ' . (int)$offset;
 $stmt = $db->prepare($sql);
 foreach ($params as $k => $v) { $stmt->bindValue($k, $v); }
 $stmt->execute();
@@ -267,8 +269,9 @@ $typesCamions = $db->query('SELECT id, nom FROM types_camions ORDER BY nom ASC')
 
 // Aide pour construire la chaîne de requête en conservant les filtres
 function build_query(array $overrides = []): string {
-    $params = array_merge($_GET, $overrides);
+    $params = $_GET;
     unset($params['page']);
+    $params = array_merge($params, $overrides);
     return http_build_query($params);
 }
 ?>
@@ -405,9 +408,9 @@ function build_query(array $overrides = []): string {
                         <?php foreach ($items as $p): ?>
                         <tr class="<?= !empty($p['surcharge']) ? 'bg-red-50' : '' ?>">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-medium text-gray-900"><?= htmlspecialchars($p['marque']) ?></div>
-                                <div class="text-sm text-gray-500"><?= htmlspecialchars($p['immatriculation']) ?></div>
-                                <div class="text-xs text-gray-500"><?= htmlspecialchars($p['type_camion']) ?></div>
+                                <div class="text-sm font-medium text-gray-900"><?= h($p['marque']) ?></div>
+                                <div class="text-sm text-gray-500"><?= h($p['immatriculation']) ?></div>
+                                <div class="text-xs text-gray-500"><?= h($p['type_camion']) ?></div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= number_format((float)$p['ptav'], 0, ',', ' ') ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900"><?= number_format((float)$p['ptac'], 0, ',', ' ') ?></td>
@@ -421,7 +424,7 @@ function build_query(array $overrides = []): string {
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                 <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full <?= $p['mouvement']==='sortie' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800' ?>">
-                                    <?= htmlspecialchars(ucfirst($p['mouvement'])) ?>
+                                    <?= h(ucfirst((string)($p['mouvement'] ?? ''))) ?>
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500"><?= date('d/m/Y H:i', strtotime($p['date_pesage'])) ?></td>

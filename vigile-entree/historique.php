@@ -166,7 +166,7 @@ $total = (int)$countStmt->fetchColumn();
 $total_pages = max(1, (int)ceil($total / $per_page));
 if ($page > $total_pages) { $page = $total_pages; $offset = ($page - 1) * $per_page; }
 
-$sql = $select . $whereSql . ' ORDER BY c.date_entree DESC LIMIT ' . (int)$per_page . ' OFFSET ' . (int)$offset;
+$sql = $select . $whereSql . ' ORDER BY c.date_entree DESC, c.id DESC LIMIT ' . (int)$per_page . ' OFFSET ' . (int)$offset;
 $stmt = $db->prepare($sql);
 foreach ($params as $k => $v) { $stmt->bindValue($k, $v); }
 $stmt->execute();
@@ -176,8 +176,9 @@ $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $typesCamions = $db->query('SELECT id, nom FROM types_camions ORDER BY nom ASC')->fetchAll(PDO::FETCH_ASSOC);
 
 function build_query(array $overrides = []): string {
-    $params = array_merge($_GET, $overrides);
+    $params = $_GET;
     unset($params['page']);
+    $params = array_merge($params, $overrides);
     return http_build_query($params);
 }
 ?>

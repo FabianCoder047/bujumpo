@@ -825,7 +825,7 @@ function generatePDF($data, $columns, $title, $filename) {
                     <div class="bg-white rounded-lg shadow p-6">
                         <h3 class="text-lg font-semibold text-gray-900 mb-1">Rapport rapide</h3>
                         <p class="text-gray-600 text-sm mb-4">Tonnage par type — Mois courant</p>
-                        <form method="get" action="api/export_rapport.php" target="_blank" class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                        <form method="get" action="api/export_rapport.php" target="_blank" class="grid grid-cols-1 md:grid-cols-6 gap-3 js-check-export">
                             <input type="hidden" name="report" value="tonnage_type" />
                             <input type="hidden" name="scope" value="month" />
                             <div class="md:col-span-2">
@@ -867,7 +867,7 @@ function generatePDF($data, $columns, $title, $filename) {
                     <div class="bg-white rounded-lg shadow p-6">
                         <h3 class="text-lg font-semibold text-gray-900 mb-1">Rapport rapide</h3>
                         <p class="text-gray-600 text-sm mb-4">Tonnage par type — Année courante</p>
-                        <form method="get" action="api/export_rapport.php" target="_blank" class="grid grid-cols-1 md:grid-cols-6 gap-3">
+                        <form method="get" action="api/export_rapport.php" target="_blank" class="grid grid-cols-1 md:grid-cols-6 gap-3 js-check-export">
                             <input type="hidden" name="report" value="tonnage_type" />
                             <input type="hidden" name="scope" value="year" />
                             <div class="md:col-span-2">
@@ -970,7 +970,7 @@ function generatePDF($data, $columns, $title, $filename) {
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <p class="text-sm font-medium text-gray-800 mb-2">Entrés</p>
-                                <form method="get" action="api/export_rapport.php" target="_blank" class="flex items-center gap-2 flex-wrap">
+                                <form method="get" action="api/export_rapport.php" target="_blank" class="flex items-center gap-2 flex-wrap js-check-export">
                                     <input type="hidden" name="report" value="camions_entree" />
                                     <label class="text-sm text-gray-700">Période</label>
                                     <select name="scope" class="border rounded px-2 py-1 text-sm">
@@ -993,7 +993,7 @@ function generatePDF($data, $columns, $title, $filename) {
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-800 mb-2">Sortis</p>
-                                <form method="get" action="api/export_rapport.php" target="_blank" class="flex items-center gap-2 flex-wrap">
+                                <form method="get" action="api/export_rapport.php" target="_blank" class="flex items-center gap-2 flex-wrap js-check-export">
                                     <input type="hidden" name="report" value="camions_sortie" />
                                     <label class="text-sm text-gray-700">Période</label>
                                     <select name="scope" class="border rounded px-2 py-1 text-sm">
@@ -1023,7 +1023,7 @@ function generatePDF($data, $columns, $title, $filename) {
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <p class="text-sm font-medium text-gray-800 mb-2">Entrés</p>
-                                <form method="get" action="api/export_rapport.php" target="_blank" class="flex items-center gap-2 flex-wrap">
+                                <form method="get" action="api/export_rapport.php" target="_blank" class="flex items-center gap-2 flex-wrap js-check-export">
                                     <input type="hidden" name="report" value="bateaux_entree" />
                                     <label class="text-sm text-gray-700">Période</label>
                                     <select name="scope" class="border rounded px-2 py-1 text-sm">
@@ -1046,7 +1046,7 @@ function generatePDF($data, $columns, $title, $filename) {
                             </div>
                             <div>
                                 <p class="text-sm font-medium text-gray-800 mb-2">Sortis</p>
-                                <form method="get" action="api/export_rapport.php" target="_blank" class="flex items-center gap-2 flex-wrap">
+                                <form method="get" action="api/export_rapport.php" target="_blank" class="flex items-center gap-2 flex-wrap js-check-export">
                                     <input type="hidden" name="report" value="bateaux_sortie" />
                                     <label class="text-sm text-gray-700">Période</label>
                                     <select name="scope" class="border rounded px-2 py-1 text-sm">
@@ -1236,14 +1236,16 @@ function generatePDF($data, $columns, $title, $filename) {
                     const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
                     const data = await res.json();
                     if (!data || !data.hasData) {
-                        alert('Aucune donnée pour cette recherche. Le rapport serait vide.');
+                        const modal = document.getElementById('emptyModal');
+                        if (modal) { modal.classList.remove('hidden'); } else { alert('Aucune donnée pour cette recherche. Le rapport serait vide.'); }
                         return;
                     }
                     // open actual export
                     const finalUrl = base + '?' + qs + '&format=' + encodeURIComponent(format);
                     window.open(finalUrl, '_blank');
                 } catch(err){
-                    alert('Impossible de vérifier le rapport. Réessayez.');
+                    const modal = document.getElementById('emptyModal');
+                    if (modal) { modal.classList.remove('hidden'); } else { alert('Impossible de vérifier le rapport. Réessayez.'); }
                 }
             });
         });

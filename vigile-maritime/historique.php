@@ -59,8 +59,9 @@ $whereSql = count($where) ? (' WHERE ' . implode(' AND ', $where)) : '';
 $typesBateaux = $db->query('SELECT id, nom FROM types_bateaux ORDER BY nom ASC')->fetchAll(PDO::FETCH_ASSOC);
 
 function build_query(array $overrides = []): string {
-    $params = array_merge($_GET, $overrides);
+    $params = $_GET;
     unset($params['page']);
+    $params = array_merge($params, $overrides);
     return http_build_query($params);
 }
 
@@ -239,18 +240,7 @@ unset($item);
             <div class="px-4 mb-4">
                 <p class="text-purple-300 text-sm font-medium">Vigile Maritime</p>
             </div>
-            <div class="mt-4 flex justify-end items-center">
-                <div class="flex gap-2">
-                    <?php if ($page > 1): ?>
-                        <a class="px-3 py-2 border rounded" href="?<?= htmlspecialchars(build_query(['page'=>1])) ?>">« Première</a>
-                        <a class="px-3 py-2 border rounded" href="?<?= htmlspecialchars(build_query(['page'=>$page-1])) ?>">‹ Précédente</a>
-                    <?php endif; ?>
-                    <?php if ($page < $total_pages): ?>
-                        <a class="px-3 py-2 border rounded" href="?<?= htmlspecialchars(build_query(['page'=>$page+1])) ?>">Suivante ›</a>
-                        <a class="px-3 py-2 border rounded" href="?<?= htmlspecialchars(build_query(['page'=>$total_pages])) ?>">Dernière »</a>
-                    <?php endif; ?>
-                </div>
-            </div>
+            
             <a href="dashboard.php" class="flex items-center px-4 py-3 text-purple-200 hover:bg-purple-800 hover:text-white transition duration-200">
                 <i class="fas fa-tachometer-alt mr-3"></i>
                 Dashboard
