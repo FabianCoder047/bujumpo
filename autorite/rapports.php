@@ -238,7 +238,7 @@ try {
                             <form method="get" action="api/export_rapport.php" target="_blank" class="flex items-center gap-2 flex-wrap js-check-export">
                                 <input type="hidden" name="report" value="camions_entree" />
                                 <label class="text-sm text-gray-700">Période</label>
-                                <select name="scope" class="border rounded px-2 py-1 text-sm">
+                                <select name="scope" class="border rounded px-2 py-1 text-sm" onchange="this.form.submit()">
                                     <option value="month">Mois courant</option>
                                     <option value="year">Année courante</option>
                                 </select>
@@ -258,7 +258,7 @@ try {
                             <form method="get" action="api/export_rapport.php" target="_blank" class="flex items-center gap-2 flex-wrap js-check-export">
                                 <input type="hidden" name="report" value="camions_sortie" />
                                 <label class="text-sm text-gray-700">Période</label>
-                                <select name="scope" class="border rounded px-2 py-1 text-sm">
+                                <select name="scope" class="border rounded px-2 py-1 text-sm" onchange="this.form.submit()">
                                     <option value="month">Mois courant</option>
                                     <option value="year">Année courante</option>
                                 </select>
@@ -285,7 +285,7 @@ try {
                             <form method="get" action="api/export_rapport.php" target="_blank" class="flex items-center gap-2 flex-wrap js-check-export">
                                 <input type="hidden" name="report" value="bateaux_entree" />
                                 <label class="text-sm text-gray-700">Période</label>
-                                <select name="scope" class="border rounded px-2 py-1 text-sm">
+                                <select name="scope" class="border rounded px-2 py-1 text-sm" onchange="this.form.submit()">
                                     <option value="month">Mois courant</option>
                                     <option value="year">Année courante</option>
                                 </select>
@@ -305,7 +305,7 @@ try {
                             <form method="get" action="api/export_rapport.php" target="_blank" class="flex items-center gap-2 flex-wrap js-check-export">
                                 <input type="hidden" name="report" value="bateaux_sortie" />
                                 <label class="text-sm text-gray-700">Période</label>
-                                <select name="scope" class="border rounded px-2 py-1 text-sm">
+                                <select name="scope" class="border rounded px-2 py-1 text-sm" onchange="this.form.submit()">
                                     <option value="month">Mois courant</option>
                                     <option value="year">Année courante</option>
                                 </select>

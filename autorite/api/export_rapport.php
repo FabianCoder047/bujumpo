@@ -286,16 +286,20 @@ if ($format === 'xlsx') {
         }
         $fileName = 'rapport_bateaux.xlsx';
     } elseif ($report === 'frais_transit') {
-        $headers = ['Voie', 'Référence', 'Partie', 'Date entrée', 'THC', 'Magasinage', 'Droits de douane', 'Surestaries', 'Total', 'Etat'];
+        $headers = ['Voie', 'Référence', 'Partie', 'Date entrée', 'FT1', 'FT2', 'FT3', 'Autres', 'Total'];
         $sheet->fromArray($headers, NULL, 'A4');
         $row = 5;
         foreach ($data as $r) {
-            $anyZero = ((float)($r['thc'] ?? 0) === 0.0) || ((float)($r['magasinage'] ?? 0) === 0.0) || ((float)($r['droits_douane'] ?? 0) === 0.0) || ((float)($r['surestaries'] ?? 0) === 0.0);
-            $etat = $anyZero ? 'AUCUN FRAIS DE TRANSIT' : 'APPLIQUÉ';
             $sheet->fromArray([
-                $r['type'], $r['ident'], ($r['partie'] ?? ''), $r['date_ref'],
-                ($r['thc'] ?? 0), ($r['magasinage'] ?? 0), ($r['droits_douane'] ?? 0), ($r['surestaries'] ?? 0), ($r['total'] ?? 0),
-                $etat
+                $r['type'],
+                $r['ident'],
+                $r['partie'] ?? '',
+                $r['date_entree'],
+                (float)($r['thc'] ?? 0) ?: '',
+                (float)($r['magasinage'] ?? 0) ?: '',
+                (float)($r['droits_douane'] ?? 0) ?: '',
+                (float)($r['surestaries'] ?? 0) ?: '',
+                (float)($r['total'] ?? 0) ?: 0
             ], NULL, 'A' . $row);
             $row++;
         }
@@ -400,22 +404,19 @@ if ($report === 'tonnage_type') {
     $html .= '</tbody></table>';
 } else { // bateaux
     if ($report === 'frais_transit') {
-        $html .= '<table><thead><tr><th>Voie</th><th>Référence</th><th>Partie</th><th>Date entrée</th><th>THC</th><th>Magasinage</th><th>Droits</th><th>Surestaries</th><th>Total</th><th>Etat</th></tr></thead><tbody>';
+        $html .= '<table><thead><tr><th>Voie</th><th>Référence</th><th>Partie</th><th>Date entrée</th><th>FT1</th><th>FT2</th><th>FT3</th><th>Autres</th><th>Total</th></tr></thead><tbody>';
         foreach ($data as $r) {
-            $anyZero = ((float)($r['thc'] ?? 0) === 0.0) || ((float)($r['magasinage'] ?? 0) === 0.0) || ((float)($r['droits_douane'] ?? 0) === 0.0) || ((float)($r['surestaries'] ?? 0) === 0.0);
-            $etat = $anyZero ? 'AUCUN FRAIS DE TRANSIT' : 'APPLIQUÉ';
-            $html .= '<tr>'
-                . '<td>' . htmlspecialchars((string)$r['type']) . '</td>'
-                . '<td>' . htmlspecialchars((string)$r['ident']) . '</td>'
-                . '<td>' . htmlspecialchars((string)($r['partie'] ?? '')) . '</td>'
-                . '<td>' . htmlspecialchars((string)$r['date_ref']) . '</td>'
-                . '<td class="num">' . number_format((float)($r['thc'] ?? 0), 2, ',', ' ') . '</td>'
-                . '<td class="num">' . number_format((float)($r['magasinage'] ?? 0), 2, ',', ' ') . '</td>'
-                . '<td class="num">' . number_format((float)($r['droits_douane'] ?? 0), 2, ',', ' ') . '</td>'
-                . '<td class="num">' . number_format((float)($r['surestaries'] ?? 0), 2, ',', ' ') . '</td>'
-                . '<td class="num">' . number_format((float)($r['total'] ?? 0), 2, ',', ' ') . '</td>'
-                . '<td>' . $etat . '</td>'
-                . '</tr>';
+            $html .= sprintf('<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class="text-right">%s</td><td class="text-right">%s</td><td class="text-right">%s</td><td class="text-right">%s</td><td class="text-right">%s</td></tr>',
+                $r['type'],
+                $r['ident'],
+                $r['partie'] ?? '',
+                $r['date_ref'] ? date('d/m/Y', strtotime($r['date_ref'])) : '',
+                number_format((float)$r['thc'], 2, ',', ' '),
+                number_format((float)$r['magasinage'], 2, ',', ' '),
+                number_format((float)$r['droits_douane'], 2, ',', ' '),
+                number_format((float)$r['surestaries'], 2, ',', ' '),
+                number_format((float)$r['total'], 2, ',', ' ')
+            );
         }
         $html .= '</tbody></table>';
     } else {

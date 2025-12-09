@@ -46,32 +46,71 @@ $user = getCurrentUser();
         <h1 class="text-2xl font-bold text-gray-900 mb-4">Frais de transit</h1>
 
         <div class="bg-white rounded-lg shadow p-6 mb-6">
-          <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-            <div class="flex items-end gap-3 flex-wrap">
-              <div>
-                <label class="block text-sm text-gray-600 mb-1">Période</label>
-                <select id="scope" class="border rounded px-3 py-2">
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+              <div class="w-full sm:w-auto">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Période</label>
+                <select id="scope" class="w-full sm:w-auto border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500">
                   <option value="month">Mois courant</option>
                   <option value="year">Année courante</option>
                   <option value="custom">Personnalisé</option>
                 </select>
               </div>
-              <div id="rangeFields" class="hidden items-end gap-3">
-                <div>
-                  <label class="block text-sm text-gray-600 mb-1">Début</label>
-                  <input id="start" type="date" class="border rounded px-3 py-2" />
+              <button id="btnReload" class="w-full sm:w-auto px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 transition-colors">
+                <i class="fas fa-redo mr-2"></i>Réinitialiser le filtre
+              </button>
+            </div>
+            
+            <div id="rangeFields" class="hidden">
+              <div class="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+                <div class="w-full sm:w-48">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Date de début</label>
+                  <input id="start" type="date" class="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" />
                 </div>
-                <div>
-                  <label class="block text-sm text-gray-600 mb-1">Fin</label>
-                  <input id="end" type="date" class="border rounded px-3 py-2" />
+                <div class="w-full sm:w-48">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Date de fin</label>
+                  <input id="end" type="date" class="w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500" />
                 </div>
-                <button id="btnFilter" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded">Appliquer</button>
+                <button id="btnFilter" class="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 transition-colors">
+                  <i class="fas fa-filter mr-2"></i>Appliquer
+                </button>
               </div>
-              <button id="btnReload" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded">Actualiser</button>
             </div>
             <div class="flex items-center gap-3">
-              <a target="_blank" href="../autorite/api/export_rapport.php?report=frais_transit&scope=month&format=pdf" class="inline-flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded"><i class="fas fa-file-pdf mr-2"></i>Rapport Frais PDF</a>
-              <a target="_blank" href="../autorite/api/export_rapport.php?report=frais_transit&scope=month&format=xlsx" class="inline-flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded"><i class="fas fa-file-excel mr-2"></i>Rapport Frais Excel</a>
+              <a id="pdfReportLink" target="_blank" href="../autorite/api/export_rapport.php?report=frais_transit&scope=month&format=pdf" class="inline-flex items-center px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded"><i class="fas fa-file-pdf mr-2"></i>Rapport Frais PDF</a>
+              <a id="excelReportLink" target="_blank" href="../autorite/api/export_rapport.php?report=frais_transit&scope=month&format=xlsx" class="inline-flex items-center px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded"><i class="fas fa-file-excel mr-2"></i>Rapport Frais Excel</a>
+              <script>
+              function updateReportLinks() {
+                  const scope = document.getElementById('scope').value;
+                  const startDate = document.getElementById('start').value;
+                  const endDate = document.getElementById('end').value;
+                  
+                  let urlBase = `../autorite/api/export_rapport.php?report=frais_transit&scope=${scope}`;
+                  
+                  if (scope === 'custom' && startDate && endDate) {
+                      urlBase += `&start=${startDate}&end=${endDate}`;
+                  }
+                  
+                  document.getElementById('pdfReportLink').href = `${urlBase}&format=pdf`;
+                  document.getElementById('excelReportLink').href = `${urlBase}&format=xlsx`;
+              }
+              
+              // Mettre à jour les liens quand la période change
+              document.getElementById('scope').addEventListener('change', updateReportLinks);
+              
+              // Mettre à jour les liens quand les dates changent
+              document.getElementById('start').addEventListener('change', updateReportLinks);
+              document.getElementById('end').addEventListener('change', updateReportLinks);
+              
+              // Mettre à jour les liens quand on clique sur le bouton Appliquer
+              document.getElementById('btnFilter').addEventListener('click', function(e) {
+                  e.preventDefault();
+                  updateReportLinks();
+              });
+              
+              // Mettre à jour les liens au chargement de la page
+              updateReportLinks();
+              </script>
             </div>
           </div>
           <div class="mt-4 overflow-auto">
@@ -139,19 +178,19 @@ $user = getCurrentUser();
             <input type="hidden" id="ref_id" />
 
             <div>
-              <label class="block text-sm text-gray-600 mb-1">THC (Terminal)</label>
+              <label class="block text-sm text-gray-600 mb-1">Frais de transit 1</label>
               <input name="thc" id="thc" type="number" min="0" step="0.01" class="w-full border rounded px-3 py-2" />
             </div>
             <div>
-              <label class="block text-sm text-gray-600 mb-1">Magasinage</label>
+              <label class="block text-sm text-gray-600 mb-1">Frais de transit 2</label>
               <input name="magasinage" id="magasinage" type="number" min="0" step="0.01" class="w-full border rounded px-3 py-2" />
             </div>
             <div>
-              <label class="block text-sm text-gray-600 mb-1">Droits de douane</label>
+              <label class="block text-sm text-gray-600 mb-1">Frais de transit 3</label>
               <input name="droits_douane" id="droits_douane" type="number" min="0" step="0.01" class="w-full border rounded px-3 py-2" />
             </div>
             <div>
-              <label class="block text-sm text-gray-600 mb-1">Surestaries</label>
+              <label class="block text-sm text-gray-600 mb-1">Autres frais</label>
               <input name="surestaries" id="surestaries" type="number" min="0" step="0.01" class="w-full border rounded px-3 py-2" />
             </div>
 
@@ -222,16 +261,31 @@ $user = getCurrentUser();
     });
     document.getElementById('btnReload').addEventListener('click', (e) => {
       e.preventDefault();
+      // Réinitialiser la période au mois courant
+      scopeEl.value = 'month';
+      // Masquer les champs de date personnalisés
+      document.getElementById('rangeFields').classList.add('hidden');
+      // Réinitialiser les champs de date
+      document.getElementById('start').value = '';
+      document.getElementById('end').value = '';
+      // Réinitialiser la pagination
+      state.page = 1;
+      // Rafraîchir les données
       fetchEntries();
     });
 
     function renderFees(fe) {
       const toNum = (v) => (v === null || v === undefined || v === '') ? 0 : Number(v);
-      const thc = toNum(fe?.thc).toFixed(2);
-      const mag = toNum(fe?.magasinage).toFixed(2);
-      const drt = toNum(fe?.droits_douane).toFixed(2);
-      const sur = toNum(fe?.surestaries).toFixed(2);
-      return `THC ${thc} • Mag ${mag} • Droits ${drt} • Sur ${sur}`;
+      const ft1 = toNum(fe?.thc).toFixed(2);
+      const ft2 = toNum(fe?.magasinage).toFixed(2);
+      const ft3 = toNum(fe?.droits_douane).toFixed(2);
+      const autres = toNum(fe?.surestaries).toFixed(2);
+      const parts = [];
+      if (ft1 > 0) parts.push(`FT1: ${ft1}`);
+      if (ft2 > 0) parts.push(`FT2: ${ft2}`);
+      if (ft3 > 0) parts.push(`FT3: ${ft3}`);
+      if (autres > 0) parts.push(`Autres: ${autres}`);
+      return parts.join('<br>') || '-';
     }
 
     function renderTotalFees(fe) {
